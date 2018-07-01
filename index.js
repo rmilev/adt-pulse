@@ -11,6 +11,7 @@ var ua =  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_4) AppleWebKit/537.36 (KH
 
 var sat = '';
 var lastsynckey = '';
+var alarmState = '';
 var deviceUpdateCB = function () {};
 var zoneUpdateCB = function () {};
 var statusUpdateCB = function () {};
@@ -20,12 +21,12 @@ pulse = function(username, password) {
 	this.authenticated = false;
 	this.isAuthenticating = false;
 	this.clients = [];
-	
+
 	this.configure({
 		username: username,
 		password: password
 	});
-	
+
 	/* heartbeat */
 	var pulseInterval = setInterval(this.sync.bind(this),5000);
 };
@@ -52,7 +53,7 @@ module.exports = pulse;
 	};
 
 	this.login = function () {
-		
+
 		var deferred = q.defer();
 		var that = this;
 
@@ -60,9 +61,9 @@ module.exports = pulse;
 			deferred.resolve()
 		} else {
 			console.log('Pulse: Authenticating');
-			
+
 			j = request.jar();
-			
+
 			that.isAuthenticating = true;
 			request(
 				{
@@ -72,7 +73,7 @@ module.exports = pulse;
 						'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
 						'User-Agent': ua
 					},
-				}, 
+				},
 				function() {
 					request.post(that.config.authUrl,
 						{
@@ -82,22 +83,22 @@ module.exports = pulse;
 								'Host': 'portal.adtpulse.com',
 								'User-Agent': ua
 							},
-							form:{ 
-								username: that.config.username, 
+							form:{
+								username: that.config.username,
 								password: that.config.password
 							}
 						},
 						function(err, httpResponse, body){
 							that.isAuthenticating = false;
-							if(err || httpResponse.req.path !== '/myhome/6.18.0-238/summary/summary.jsp'){
+							if(err || httpResponse.req.path !== '/myhome/9.7.0-31/summary/summary.jsp'){
 								that.authenticated = false;
-								console.log('Pulse: Authentication Failed');
+								console.log('Pulse: Authentication Failed'+err);
 								deferred.reject()
 							} else {
 								that.authenticated = true;
 								console.log('Pulse: Authentication Success');
 								deferred.resolve();
-								that.updateAll.call(that);
+								//	that.updateAll.call(that);
 							}
 						}
 					);
@@ -105,8 +106,8 @@ module.exports = pulse;
 			);
 		}
 
-			
-		
+
+
 		return deferred.promise
 	},
 
@@ -130,119 +131,13 @@ module.exports = pulse;
 
 	this.updateAll = function () {
 		var that = this;
-		this.getAlarmStatus().then(function(){
-			that.getDeviceStatus();
-			that.getZoneStatus();
-		});		
+		this.getAlarmStatus();
 	}
 
 
-	this.getZoneStatus = function() {
-		console.log('Pulse: Getting Zone Statuses');
-		var deferred = q.defer()
-
-		request(
-			{
-				url: this.config.sensorUrl,
-				jar: j,
-				headers: {
-					'User-Agent': ua
-				},
-			}, 
-			function(err, httpResponse, body) {
-				if(err){
-					console.log('Pulse: Zone JSON Failed');
-				} else {
-					try {
-						var json = JSON.parse(body.trim());
-						json.items.forEach(function(obj){
-					   		if(obj.tags.indexOf('zone') > -1){
-					   			// obj.icon = obj.icon.replace('devStat', '');
-					   			zoneUpdateCB(obj)
-					   		}
-						})
-					} catch(e) {
-					   console.log('Pulse: Invalid Zone JSON');
-					}
-				}
-					
-			}
-		);
-
-		return deferred.promise;
-	},
-
-	this.getDeviceStatus = function() {
-		console.log('Pulse: Getting Device Statuses');
-
-		request(
-			{
-				url: this.config.otherStatusUrl,
-				jar: j,
-				headers: {
-					'User-Agent': ua
-				},
-			}, 
-			function(err, httpResponse, body) {
-				$ = cheerio.load(body);
-				$('tr tr.p_listRow').each(function(el){
-					deviceUpdateCB({
-						name: $(this).find('td').eq(2).text(),
-						serialnumber: $(this).find('td').eq(2).find('a').attr('href').split('\'')[1],
-						state: $(this).find('td').eq(3).text().trim().toLowerCase() == 'off' ? 0 : 1
-					})
-				})
-			}
-		);
-	},
-
-	this.onDeviceUpdate = function (updateCallback) {
-		deviceUpdateCB = updateCallback;
-	},
-	this.onZoneUpdate = function (updateCallback) {
-		zoneUpdateCB = updateCallback;
-	},
 	this.onStatusUpdate = function (updateCallback) {
 		statusUpdateCB = updateCallback;
 	},
-
-	this.deviceStateChange = function (device) {
-		console.log('Pulse: Device State Change', device.name, device.state);
-
-		var deferred = q.defer();
-
-		request.post(this.config.statusChangeUrl + '?fi='+device.serialnumber+'&vn=level&u=On|Off&ft=light-onoff',
-			
-			{
-				followAllRedirects: true,
-				jar: j,
-				headers: {
-					'Host': 'portal.adtpulse.com',
-					'User-Agent': ua,
-					'Referer': 'https://portal.adtpulse.com/myhome/summary/summary.jsp'
-				},
-				form:{ 
-					sat: sat, 
-					value: device.state == 0 ? 'Off' : 'On'
-				}
-			},
-			function(err, request, body){
-				if(err){
-					console.log('Pulse: Device State Failure');
-					deferred.reject()
-				} else {
-					console.log('Pulse: Device State Success');
-					deferred.resolve();
-				}
-			}
-		);
-
-
-
-		// https://portal.adtpulse.com/myhome/quickcontrol/serv/ChangeVariableServ
-
-		return deferred.promise;
-	}
 
 	this.getAlarmStatus = function () {
 		console.log('Pulse: Getting Alarm Statuses');
@@ -255,63 +150,44 @@ module.exports = pulse;
 				headers: {
 					'User-Agent': ua
 				},
-			}, 
+			},
 			function(err, httpResponse, body) {
-
-				var actions = [];
-
-				//get the sat code
-				sat = body.match(/sat=([^&]*)&/)[1];
-
-				//parse the html
-				$ = cheerio.load(body);
-				
-				//grab the action buttons
-				$('#divOrbSecurityButtons input').each(function(el){
-					
-					//get the args from the onclick 
-					var matches = $(this).attr('onclick').match(/'([^']*)'/g);
-					
-					//remove the singl quotes
-					matches.forEach(function(obj, index, arr){
-						arr[index] = obj.replace(/'/gi,'');
-					});
-
-					//populate the values
-					var values = {
-						instance: matches[0],
-						newstate:matches[1],
-						units: matches[2]
+				if(err){
+					deferred.reject();
+				} else {
+					$ = cheerio.load(body);
+					alarmState
+					var newState = $('#divOrbTextSummary span').text();
+					if(alarmState != newState){
+						statusUpdateCB(newState);
 					}
+					alarmState = newState;
+					deferred.resolve(newState);
+				}
 
-					//push the action
-					actions.push({
-						label: $(this).val(),
-						values: values
-					})
-				})
-
-				statusUpdateCB({
-					status: $('#divOrbTextSummary span').text(),
-					actions: actions
-				})
-
-
-				deferred.resolve();
 			}
 		);
 
 		return deferred.promise;
-
 	},
 
-	
 
-	this.setAlarmState = function (action) {
-		
+	this.setAlarmStateStay = function (){this.setAlarmState('disarmed','stay');},
+
+	this.setAlarmStateAway = function (){this.setAlarmState('disarmed','away');},
+
+	this.setAlarmStateOff = function (){this.setAlarmState('away','off');},
+
+	this.setAlarmState = function (armstate, arm) {
+
 		var deferred = q.defer();
-		
-		var url = this.config.statusChangeUrl+'?rtn=xml&fi='+encodeURIComponent(action.instance)+'&vn=arm-state&u='+encodeURIComponent(action.units)+'&ft=security-panel&sat=' + sat + '&value=' + encodeURIComponent(action.newstate);
+
+		// url: "https://portal.adtpulse.com/myhome/9.7.0-31/quickcontrol/armDisarmRRA.jsp?href=rest/adt/ui/client/security/setArmState&armstate=disarmed&arm=stay",
+		// url: "https://portal.adtpulse.com/myhome/9.7.0-31/quickcontrol/armDisarmRRA.jsp?href=rest/adt/ui/client/security/setArmState&armstate=disarmed&arm=away",
+		//url: "https://portal.adtpulse.com/myhome/9.7.0-31/quickcontrol/armDisarmRRA.jsp?href=rest/adt/ui/client/security/setArmState&armstate=away&arm=off",
+
+
+		var url = "https://portal.adtpulse.com/myhome/9.7.0-31/quickcontrol/armDisarmRRA.jsp?href=rest/adt/ui/client/security/setArmState&armstate="+armstate+"&arm="+arm;
 
 		request(
 			{
@@ -321,21 +197,18 @@ module.exports = pulse;
 					'User-Agent': ua,
 					'Referer': 'https://portal.adtpulse.com/myhome/summary/summary.jsp'
 				},
-			}, 
+			},
 			function(err, httpResponse, body) {
 				if(err){
 					onsole.log('Pulse setAlarmState Failed');
-					deferred.reject()
+					deferred.reject();
 				} else {
 					console.log('Pulse setAlarmState Success');
-					console.log(body);
-					deferred.resolve(body);
+					deferred.resolve();
 				}
-				
+
 			}
 		);
-
-		console.log(action);
 
 		return deferred.promise;
 
@@ -350,15 +223,16 @@ module.exports = pulse;
 			this.clients.push(uid);
 			this.sync();
 		}
-		
+
 	}
 
 	this.sync = function () {
 		if(this.clients.length && !this.isAuthenticating){
 			var that = this;
 			this.login().then(function(){
+				var url = that.config.syncUrl+"?t="+Date.now();
 				request({
-					url: that.config.syncUrl,
+					url: url,
 					jar: j,
 					followAllRedirects: true,
 					headers: {
@@ -366,20 +240,20 @@ module.exports = pulse;
 						'Referer': 'https://portal.adtpulse.com/myhome/summary/summary.jsp'
 					},
 				},function(err, response, body){
-					console.log('Pulse: Syncing', body);
+					console.log('Pulse: Syncing', body, lastsynckey);
 					if(err || !body || body.indexOf("<html") > -1){
 						that.authenticated = false;
 						console.log('Pulse: Sync Failed');
-					} else if (lastsynckey != body|| "1-0-0" == body) {
+					} else if (lastsynckey != body || "1-0-0" == body) {
 					 	lastsynckey = body;
 					 	that.updateAll.call(that);
 					 }
 				})
 			})
-				
+
 		} else {
 
 		}
-		
+
 	}
 }).call(pulse.prototype);
