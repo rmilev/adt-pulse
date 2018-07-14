@@ -1,12 +1,12 @@
 {
-  "name": "adt-pulse",
-  "version": "0.1.0",
+  "name": "adt-pulse-simple",
+  "version": "0.1.1",
   "description": "View and control your ADT Pulse system",
   "main": "index.js",
-  "homepage": "https://github.com/kevinmhickey/adt-pulse.git",
+  "homepage": "https://github.com/rmilev/adt-pulse.git",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kevinmhickey/adt-pulse.git"
+    "url": "https://github.com/rmilev/adt-pulse.git"
   },
   "keywords": [
     "ADT",
