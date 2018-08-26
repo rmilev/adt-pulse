@@ -16,6 +16,22 @@ var deviceUpdateCB = function () {};
 var zoneUpdateCB = function () {};
 var statusUpdateCB = function () {};
 
+pulse = function(username, password) {
+
+	this.authenticated = false;
+	this.isAuthenticating = false;
+	this.clients = [];
+
+	this.configure({
+		username: username,
+		password: password
+	});
+
+	/* heartbeat */
+	var pulseInterval = setInterval(this.sync.bind(this),5000);
+};
+
+module.exports = pulse;
 
 (function() {
 
@@ -241,20 +257,3 @@ var statusUpdateCB = function () {};
 
 	}
 }).call(pulse.prototype);
-
-pulse = function(username, password) {
-
-	this.authenticated = false;
-	this.isAuthenticating = false;
-	this.clients = [];
-
-	this.configure({
-		username: username,
-		password: password
-	});
-
-	/* heartbeat */
-	var pulseInterval = setInterval(this.sync.bind(this),5000);
-};
-
-module.exports = pulse;
