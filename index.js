@@ -74,7 +74,7 @@ var statusUpdateCB = function () {};
 						},
 						function(err, httpResponse, body){
 							that.isAuthenticating = false;
-							if(err || httpResponse.req.path !== '/myhome/9.7.0-31/summary/summary.jsp'){
+							if(err || httpResponse.req.path !== '/myhome/10.0.0-60/summary/summary.jsp'){
 								that.authenticated = false;
 								console.log('Pulse: Authentication Failed'+err);
 								deferred.reject()
